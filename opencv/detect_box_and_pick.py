@@ -9,37 +9,26 @@ import time
 import numpy as np
 import imutils
 class ShapeDetector:
-	def __init__(self):
-		pass
-	def detect(self, c):
-		# initialize the shape name and approximate the contour
-		shape = "unidentified"
-		peri = cv2.arcLength(c, True)
-		approx = cv2.approxPolyDP(c, 0.04 * peri, True)
-        # if the shape is a triangle, it will have 3 vertices
-		# if len(approx) == 3:
-		# 	shape = "triangle"
-		# # if the shape has 4 vertices, it is either a square or
-		# # a rectangle
-		if len(approx) == 4:
-			# compute the bounding box of the contour and use the
-			# bounding box to compute the aspect ratio
-			(x, y, w, h) = cv2.boundingRect(approx)
-			ar = w / float(h)
-			# a square will have an aspect ratio that is approximately
-			# equal to one, otherwise, the shape is a rectangle
-			shape = "square" if ar >= 0.95 and ar <= 1.05 else "rectangle"
-		# # if the shape is a pentagon, it will have 5 vertices
-		# elif len(approx) == 5:
-		# 	shape = "pentagon"
-		# # otherwise, we assume the shape is a circle
-		# else:
-		# 	shape = "circle"
-		# # return the name of the shape
-		return shape
+    def __init__(self):
+        pass
+    def detect(self, c):
+        # initialize the shape name and approximate the contour
+        peri = cv2.arcLength(c, True)
+        area=cv2.contourArea(c,True)
+        approx = cv2.approxPolyDP(c, 0.0001 * peri, True)
+        print(peri)
+        if len(approx) == 4:
+            # compute the bounding box of the contour and use the
+            # bounding box to compute the aspect ratio
+            (x, y, w, h) = cv2.boundingRect(approx)
+            ar = w / float(h)
+            print(x, y, w, h,w*h)
+            if w*h<20000 and w*h >10000:
+                rospy.loginfo("This is ok--")
+                return True
+        return False
 
 class DetectTile:
-
     def __init__(self):
         # 创建cv_bridge，声明图像的发布者和订阅者
         self.image_pub = rospy.Publisher("cv_bridge_image", Image, queue_size=1)
@@ -84,9 +73,9 @@ class DetectTile:
                     c *= ratio
                     c = c.astype("int")
                     cv2.drawContours(image, [c], -1, (0, 255, 0), 2)
-                    if shape!="unidentified":
-                        cv2.putText(image, shape, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.5, (255, 255, 255), 2)
+                    if shape==True:
+                        cv2.putText(image, str((cX, cY)), (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5, (255, 0, 0), 2)
                     # show the output image
                     cv2.namedWindow( 'Image', cv2.WINDOW_NORMAL)
                     cv2.imshow("Image", image)
