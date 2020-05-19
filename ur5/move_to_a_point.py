@@ -33,12 +33,13 @@ def main():
     while not rospy.is_shutdown():
         rospy.loginfo("start while-----")
         t=0
-        vel=0.4
+        vel=0.3
         ace=50
         # vel=1.05
         # ace=1.4
         qq=[
-            [46.15,-95.53,-80.33,-94.89,92.00,177.78]
+            [6.15,-95.53,-80.33,-94.89,92.00,177.78]
+            # [53.57,-103.22,-71.04,-96.31,91.8,133.87]
             ]
         for ii in range(len(qq)):
             qt=change_angle_to_pi(qq[ii])

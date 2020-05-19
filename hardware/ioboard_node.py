@@ -36,7 +36,7 @@ class Io_board():
     def Init_node(self):
         rospy.init_node(self.nodename)
     def Io_callback(self,msg):
-        risoy.loginfo(msg.data)
+        rospy.loginfo(msg.data)
         self.iostatebuff.append(msg.data)
     def Io_Sub(self,topicname):
         sub = rospy.Subscriber(topicname, String, self.Io_callback)
@@ -57,22 +57,22 @@ def main():
     try:
         serial = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.5)  #/dev/ttyUSB0
         if serial.isOpen() :
-            risoy.loginfo("open port success")
+            rospy.loginfo("open port success")
         else :
-            risoy.loginfo("open port failed")
+            rospy.loginfo("open port failed")
     except:
         serial = serial.Serial('/dev/ttyUSB1', 115200, timeout=0.5)  #/dev/ttyUSB0
         if serial.isOpen() :
-            risoy.loginfo("open port success")
+            rospy.loginfo("open port success")
         else :
-            risoy.loginfo("open port failed")
+            rospy.loginfo("open port failed")
     rate = rospy.Rate(4)
     #rostopic pub /io_state std_msgs/String "55C8070155"
     while not rospy.is_shutdown():
         #data =recv(serial)
         if len(iob.iostatebuff)!=0:
             iocmd=iob.iostatebuff[-1]
-            risoy.loginfo("receive : ",iocmd)
+            rospy.loginfo("receive : %s",str(iocmd))
             time.sleep(1)
             serial.write(iocmd.decode("hex")) #数据写回
         else:

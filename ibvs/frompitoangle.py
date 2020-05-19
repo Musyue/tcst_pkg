@@ -60,7 +60,10 @@ if __name__=="__main__":
     Q7=[-3.04,-52.20,49.33,-180.78,-84.35,-65.07]
     Q8=[84.81, -124.65, -78.10, 99.59, -96.62, 89.99]
     Q9=[1.4794633333333334, -2.17445, -1.3624111111111112, 1.7372922222222222, -1.6854822222222223, 1.5698255555555556]
-    display(getangle(Q9))
+    Q10=[5.,-139.,-79.,-51.,91.,177.]
+    # print getpi(Q10)
+    display(getpi(Q10))
+    # display(getangle(Q9))
     #display(getpi(Q0))
     #reslut.append(display(getpi(Q8)))
     #display(getpi(Q1))
@@ -79,5 +82,5 @@ if __name__=="__main__":
     # reslut.append(display(getpi(Q6)))
     # display(getpi(Q7))
     # reslut.append(display(getpi(Q7)))
-    print(reslut)
+    # print(reslut)
 

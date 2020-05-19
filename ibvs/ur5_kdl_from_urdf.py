@@ -12,13 +12,13 @@ from pykdl_utils.kdl_kinematics import KDLKinematics
 class UR_robot:
     def __init__(self):
         # rospy.init_node("import_ur3_from_urdf")
-        self.robot = self.init_robot("/data/ros/ur_ws_yue/src/ur5_planning/urdf/ur3.urdf")
+        self.robot = self.init_robot("/data/ros/yue_ws_201903/src/tcst_pkg/urdf/ur5.urdf")
         self.kdl_kin = KDLKinematics(self.robot, "base_link", "ee_link")
         self.tree = kdl_tree_from_urdf_model(self.robot)
         self.chain = self.tree.getChain("base_link", "ee_link")
         # safe angle of UR3
 
-        self.safe_q = [1.3189744444444444, -2.018671111111111, 1.8759755555555557, 2.7850055555555557, 0.17444444444444443, 3.7653833333333337]
+        self.safe_q = [0.20741444444444448, -1.8128266666666668, -1.2626288888888888, -1.66891, 1.6191933333333333, 3.204893333333333]
         self.q = self.safe_q
 
     def init_robot(self, filename):

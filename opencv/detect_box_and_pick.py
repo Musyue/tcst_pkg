@@ -17,15 +17,15 @@ class ShapeDetector:
         area=cv2.contourArea(c,True)
         approx = cv2.approxPolyDP(c, 0.0001 * peri, True)
         print(peri)
-        if len(approx) == 4:
+        if len(approx) >= 4 and peri<800 and peri>300:
             # compute the bounding box of the contour and use the
             # bounding box to compute the aspect ratio
-            (x, y, w, h) = cv2.boundingRect(approx)
-            ar = w / float(h)
-            print(x, y, w, h,w*h)
-            if w*h<20000 and w*h >10000:
-                rospy.loginfo("This is ok--")
-                return True
+            # (x, y, w, h) = cv2.boundingRect(approx)
+            # ar = w / float(h)
+            # print(x, y, w, h,w*h)
+            # if w*h<20000 and w*h >10000:
+            #     rospy.loginfo("This is ok--")
+            return True
         return False
 
 class DetectTile:
@@ -54,9 +54,9 @@ class DetectTile:
             resized = imutils.resize(image, width=640)
             ratio = image.shape[0] / float(resized.shape[0])
             gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            blurred = cv2.GaussianBlur(gray, (11,11), 0)
             thresh = cv2.threshold(blurred, 150, 255, cv2.THRESH_BINARY)[1]
-            cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+            cnts = cv2.findContours(thresh.copy(), cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
             cnts = imutils.grab_contours(cnts)
             sd = ShapeDetector()
             for c in cnts:
@@ -72,31 +72,32 @@ class DetectTile:
                     c = c.astype("float")
                     c *= ratio
                     c = c.astype("int")
-                    cv2.drawContours(image, [c], -1, (0, 255, 0), 2)
+                    
                     if shape==True:
+                        cv2.drawContours(image, [c], -1, (0, 255, 0), 2)
                         cv2.putText(image, str((cX, cY)), (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.5, (255, 0, 0), 2)
                     # show the output image
-                    cv2.namedWindow( 'Image', cv2.WINDOW_NORMAL)
-                    cv2.imshow("Image", image)
-                    cv2.namedWindow( 'thresh', cv2.WINDOW_NORMAL)
-                    cv2.imshow( 'thresh', thresh )
-                    cv2.waitKey(8)
+            cv2.namedWindow( 'Image', cv2.WINDOW_NORMAL)
+            cv2.imshow("Image", image)
+            cv2.namedWindow( 'thresh', cv2.WINDOW_NORMAL)
+            cv2.imshow( 'thresh', thresh )
+            cv2.waitKey(8)
 
-                # # 再将opencv格式额数据转换成ros image格式的数据发布
-                try:
-                    self.image_pub.publish(self.bridge.cv2_to_imgmsg(rgb_image, "bgr8"))
-                except CvBridgeError as e:
-                    print(e)
+            # # 再将opencv格式额数据转换成ros image格式的数据发布
+            try:
+                self.image_pub.publish(self.bridge.cv2_to_imgmsg(rgb_image, "bgr8"))
+            except CvBridgeError as e:
+                print(e)
 
 
 def main():
     try:
         # 初始化ros节点
-        rospy.init_node("cv_bridge_test")
+        rospy.init_node("cv_bridge_test_1")
         rospy.loginfo("Starting cv_bridge_test node")
         k=DetectTile()
-        rate=rospy.Rate(30)
+        rate=rospy.Rate(1)
         while not rospy.is_shutdown():
             k.process_rgb_image(k.rgb_image)
             # cen=k.process_rgb_image(k.rgb_image)
