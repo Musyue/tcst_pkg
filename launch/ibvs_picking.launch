@@ -20,6 +20,9 @@
     <param name="open_go_to_desire" value="0" />
     <param name="open_ibvs_flag" value="0" />
     <param name="open_go_desire_flag" value="0" />
+    <param name="choose_next_point" value="0" />
+    <param name="threshold_min" value="120" />
+    <param name="color_min" value="120" />
     <node pkg="tcst_pkg" type="detect_box_and_pick_sucking.py" name="detect_box_and_pick_sucking" output="screen" >
     </node>
     

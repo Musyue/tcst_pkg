@@ -89,7 +89,36 @@ class DetectTile:
                 self.image_pub.publish(self.bridge.cv2_to_imgmsg(rgb_image, "bgr8"))
             except CvBridgeError as e:
                 print(e)
+    def corner(self,rgb_image):
+        image=rgb_image
 
+        if image is not None:
+            # resized = imutils.resize(image, width=640)
+            # ratio = image.shape[0] / float(resized.shape[0])
+            gray = cv2.cvtColor(image,cv2.COLOR_BGR2GRAY)
+            # lurred = cv2.GaussianBlur(gray, (11,11), 0)
+            gray = np.float32(gray)
+            
+            # 输入图像必须是 float32 ,最后一个参数在 0.04 到 0.05 之间
+            dst = cv2.cornerHarris(gray,2,3,0.07)
+            
+            #result is dilated for marking the corners, not important
+            dst = cv2.dilate(dst,None)
+            
+            # Threshold for an optimal value, it may vary depending on the image.
+            image[dst>0.1*dst.max()]=[0,0,255]
+            cv2.namedWindow( 'dst', cv2.WINDOW_NORMAL)
+            cv2.imshow('dst',image)
+            # cv2.namedWindow( 'lurred', cv2.WINDOW_NORMAL)
+            # cv2.imshow('lurred',lurred)
+
+            cv2.waitKey(8)
+
+            # # 再将opencv格式额数据转换成ros image格式的数据发布
+            try:
+                self.image_pub.publish(self.bridge.cv2_to_imgmsg(image, "bgr8"))
+            except CvBridgeError as e:
+                print(e)
 
 def main():
     try:
@@ -99,7 +128,8 @@ def main():
         k=DetectTile()
         rate=rospy.Rate(1)
         while not rospy.is_shutdown():
-            k.process_rgb_image(k.rgb_image)
+            # k.process_rgb_image(k.rgb_image)
+            k.corner(k.rgb_image)
             # cen=k.process_rgb_image(k.rgb_image)
             # print "cenpixel\n",cen
             rate.sleep()
