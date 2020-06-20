@@ -270,7 +270,12 @@ class VisonControl():
         print "list",detajoint.tolist()
         return listangular
     def return_error_ok(self,feature_error_x,feature_error_y):
-        if abs(feature_error_x) <=2 and abs(feature_error_y)<=2:
+        if abs(feature_error_x) <=5 and abs(feature_error_y)<=5:
+            return True
+        else:
+            return False
+    def return_error_ok_desire(self,feature_error_x,feature_error_y):
+        if abs(feature_error_x) <=15 and abs(feature_error_y)<=15:
             return True
         else:
             return False
@@ -365,7 +370,7 @@ def main():
         open_ibvs_flag=rospy.get_param("open_ibvs_flag")
         open_go_desire_flag=rospy.get_param("open_go_desire_flag")
         open_go_to_desire=rospy.get_param("open_go_to_desire")
-        # print(p0.uv_list_buffer)
+        print(p0.uv_list_buffer)
         if open_ibvs_flag==1:
             if len(p0.uv_list_buffer)!=0:
 
@@ -430,11 +435,12 @@ def main():
                         rospy.set_param("open_go_desire_flag",1)
                         rospy.set_param("/open_go_to_desire",1)
                         uvlist=[]
+                        p0.uv_list_buffer=[]
 
         if open_go_desire_flag==1 and open_ibvs_flag==0:
             if len(p0.uv_desire_list_buffer)!=0:
                             # desire_object=p0.image_space_planning([569,474],[44,65],3,3)
-                            uvlist.append([p0.uv_desire_list_buffer[-1][0]+50,p0.uv_desire_list_buffer[-1][1]+40])
+                            uvlist.append([p0.uv_desire_list_buffer[-1][0]+70,p0.uv_desire_list_buffer[-1][1]+55])
                             # uvlist.append([313,212])
                             print "##############################################################"
                             print "uv-list------\n",uvlist
@@ -446,8 +452,8 @@ def main():
                             #get error
                             print "##############################################################"
                             feature_error=p0.get_feature_error(desiruv,uvlist[0])
-                            print "Ibvs is ok?---",p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])
-                            if p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==False:
+                            print "Ibvs is ok?---",p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])
+                            if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==False:
                                 print "feature error\n",feature_error
                                 u_error_pub.publish(feature_error.tolist()[0][0])
                                 v_error_pub.publish(feature_error.tolist()[0][1])
@@ -477,17 +483,13 @@ def main():
                                     vel) + "," + "t=" + str(urt) + ")"
                                 print ss
                                 ur_pub.publish(ss)
-                            if p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
+                            if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
                                 # rospy.set_param("/open_go_to_object",0)
                                 
-                                count_for_desire+=1
-                                rospy.set_param("/open_go_to_desire",0)
-                                rospy.set_param("/open_go_to_object",1)
-                                rospy.set_param("open_ibvs_flag",1)
-                                rospy.set_param("/choose_next_point",count_for_desire)
+
                                 rospy.logerr("============go to next point [%s]============",str(count_for_desire))
-                                x_length=0
-                                y_length=0
+                                x_length=-0.016
+                                y_length=-0.065
                                 z_depth=-0.52
                                 p0.move_to_sucking(ur_pub,down_to_q,x_length,y_length,z_depth,0.4,ace,urt)
                                 time.sleep(2)
@@ -498,6 +500,11 @@ def main():
                                 rospy.set_param("open_go_desire_flag",0)
                                 p0.move_ur(ur_pub,start_angular_back,0.4,ace,urt)
                                 time.sleep(5)
+                                rospy.set_param("/open_go_to_desire",0)
+                                rospy.set_param("/open_go_to_object",1)
+                                rospy.set_param("open_ibvs_flag",1)
+                                count_for_desire+=1
+                                rospy.set_param("/choose_next_point",count_for_desire)
 
 
             

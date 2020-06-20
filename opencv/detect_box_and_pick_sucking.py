@@ -67,6 +67,7 @@ class DetectTile:
         self.last_time_desire_pub_data=[] #use for filter
         self.last_time_object_pub_data=[]
         self.obejct_pub_list_temp=[]
+        self.last_time_desire_first_time=[]
     def callback(self,data):
         try:
             video_capture=self.bridge.imgmsg_to_cv2(data,"bgr8")
@@ -120,6 +121,38 @@ class DetectTile:
         # combine the mask
         mask = cv2.bitwise_or(white_mask, yellow_mask)
         return cv2.bitwise_and(image, image, mask=mask)
+    def filter_region(self,image, vertices):
+        """
+        Create the mask using the vertices and apply it to the input image
+        """
+        mask = np.zeros_like(image)
+        if len(mask.shape) == 2:
+            cv2.fillPoly(mask, vertices, 255)
+        else:
+            cv2.fillPoly(mask, vertices, (255,) * mask.shape[2])  # in case, the input image has a channel dimension
+        return cv2.bitwise_and(image, mask)
+
+    def select_region(self,image,bottom_left_cols1,bottom_left_rows1,top_left_cols1,top_left_rows1,bottom_right_cols1,bottom_right_rows1,top_right_cols1,top_right_rows1):
+        """
+        It keeps the region surrounded by the `vertices` (i.e. polygon).  Other area is set to 0 (black).
+        bottom_left_cols1=0.53
+        bottom_left_rows1=0.70
+        top_left_cols1=0.53
+        top_left_rows1=0.28
+        bottom_right_cols1=0.95
+        bottom_right_rows1=0.70
+        top_right_cols1=0.99
+        top_right_rows1=0.28
+        """
+        # first, define the polygon by vertices
+        rows, cols = image.shape[:2]
+        bottom_left = [cols * bottom_left_cols1, rows * bottom_left_rows1]
+        top_left = [cols * top_left_cols1, rows * top_left_rows1]
+        bottom_right = [cols * bottom_right_cols1, rows * bottom_right_rows1]
+        top_right = [cols *top_right_cols1, rows * top_right_rows1]
+        # the vertices are an array of polygons (i.e array of arrays) and the data type must be integer
+        vertices = np.array([[bottom_left, top_left, top_right, bottom_right]], dtype=np.int32)
+        return self.filter_region(image, vertices)
     def takeSecond(self,elem):
         return elem[1]
     def takeFirst(self,elem):
@@ -133,6 +166,8 @@ class DetectTile:
         self.cross_point_data=[]
         self.avg_data_x=[]
         self.avg_data_y=[]
+        cX=0
+        cY=0
         pub_data=[]
         open_go_to_object=rospy.get_param("open_go_to_object")
         choose_next_point=rospy.get_param("choose_next_point")
@@ -181,7 +216,7 @@ class DetectTile:
                             cv2.putText(image, str((cX, cY)), (cX, cY), cv2.FONT_HERSHEY_SIMPLEX,
                                     1, (0, 0, 255), 2)
                             # print("objtct publish------",str((cX, cY)))
-                            if len(self.obejct_pub_list_temp)>5:
+                            if len(self.obejct_pub_list_temp)>2:
                                 self.obejct_pub_list_temp=self.obejct_pub_list_temp[1:]
                                 self.obejct_pub_list_temp.append((cX, cY))
                             else:
@@ -190,8 +225,9 @@ class DetectTile:
                     pub_data = sorted(self.obejct_pub_list_temp,key=lambda x:(x[1],x[0]))
 
                     # self.object_pub.publish(str((cX, cY)))
-                    if len(self.last_time_object_pub_data)!=0:
+                    if len(self.last_time_object_pub_data)!=0 and cX!=0 and cY!=0:
                         if abs(self.last_time_object_pub_data[0]-cX)>200: #滤波
+                            self.last_time_object_pub_data=pub_data[0]
                             self.object_pub.publish(str(self.last_time_object_pub_data))
                             cv2.circle(image, self.last_time_object_pub_data, 10, (0, 255, 255), -1)
                         else:
@@ -224,6 +260,8 @@ class DetectTile:
                     # pub_data=[]
                 except:
                     pass
+                # image=self.select_region(image,0.44, 0.80, 0.44, 0.15, 0.70, 0.80, 0.70, 0.15)
+                image=self.select_region(image,0.05, 0.60, 0.05, 0.01, 0.85, 0.60, 0.85, 0.01)
                 YHLS=self.select_yellow(image,data_min)
                 gray = cv2.cvtColor(YHLS, cv2.COLOR_BGR2GRAY)
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(5, 5))
@@ -264,7 +302,7 @@ class DetectTile:
                                     self.avg_data_y.append(dd[1])
                                     print("dd",dd)
                                     cv2.circle(image, dd, 10, (0, 0, 255), -1)
-                                    if len(self.cross_point_data)>5:
+                                    if len(self.cross_point_data)>10:
                                         self.cross_point_data=self.cross_point_data[1:]
                                         self.cross_point_data.append(dd)
                                     else:
@@ -275,20 +313,23 @@ class DetectTile:
                     if len(self.cross_point_data)!=0:
                         pub_data = sorted(self.cross_point_data,key=lambda x:(x[1],x[0]))
                         print("desire pub_data-======>",pub_data)
-                        
-                        if len(self.last_time_desire_pub_data)!=0:
-                            if abs(self.last_time_desire_pub_data[0]-pub_data[choose_next_point][0])>200:
-                                self.desire_pub.publish(str(self.last_time_desire_pub_data))
-                                cv2.circle(image, self.last_time_desire_pub_data, 10, (0, 255, 255), -1)
-                            else:
-                                cv2.circle(image, pub_data[choose_next_point], 10, (0, 255, 255), -1)
-                                # print("desire pub_data-======>",pub_data)
-                                # if dd[1]<100 and dd[1]>40:
-                                # rospy.loginfo("publisher----%s",str(dd))
-                                self.desire_pub.publish(str(pub_data[choose_next_point]))
-                                self.last_time_desire_pub_data=pub_data[choose_next_point]
-                        else:
-                            self.last_time_desire_pub_data=pub_data[choose_next_point]
+                        try:
+                            if len(pub_data)>=choose_next_point:
+                                if len(self.last_time_desire_pub_data)!=0:
+                                    if abs(self.last_time_desire_pub_data[0]-pub_data[choose_next_point][0])>200:
+                                        self.desire_pub.publish(str(self.last_time_desire_pub_data))
+                                        cv2.circle(image, self.last_time_desire_pub_data, 10, (0, 255, 255), -1)
+                                    else:
+                                        cv2.circle(image, pub_data[choose_next_point], 10, (0, 255, 255), -1)
+                                        # print("desire pub_data-======>",pub_data)
+                                        # if dd[1]<100 and dd[1]>40:
+                                        # rospy.loginfo("publisher----%s",str(dd))
+                                        self.desire_pub.publish(str(pub_data[choose_next_point]))
+                                        self.last_time_desire_pub_data=pub_data[choose_next_point]
+                                else:
+                                    self.last_time_desire_pub_data=pub_data[choose_next_point]
+                        except:
+                            print("last_time_desire_pub_data[0]-pub_data[choose_next_point][0])>200 error")
 
                     cv2.namedWindow( 'YHLS_Black_HLS_Space', cv2.WINDOW_NORMAL )
                     cv2.imshow( 'YHLS_Black_HLS_Space', YHLS )
