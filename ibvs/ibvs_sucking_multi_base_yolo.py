@@ -9,32 +9,32 @@ from urdf_parser_py.urdf import URDF
 from pykdl_utils.kdl_parser import kdl_tree_from_urdf_model
 from pykdl_utils.kdl_kinematics import KDLKinematics
 from ur5_kinematics import Kinematic
-#import cv2
+
 import rospy
 import yaml,os
 from trans_methods import *
+
 from get_arpose_from_ar import *
-from ar_track_alvar_msgs.msg import AlvarMarkers
-from hand_in_eye import *
+
+import Quaternion as Q
 from std_msgs.msg import String
 from sensor_msgs.msg import JointState
 from ur5_pose_get import *
 from std_msgs.msg import Float64
-import re,os
-class VisonControl():
-    def __init__(self,califilename,sim,lambda1,urdfname):
+import re
+
+class IBVSControl():
+    def __init__(self,califilename,lambda1,urdfname):
         self.califilename=califilename
-        self.sim=sim
         self.lambda1=lambda1
         self.urdfname=urdfname
         
-        rospy.init_node("vision_control_one_feature")
+        rospy.init_node("ibvs_box_picking")
         self.sub_object_uv=rospy.Subscriber("/object_data_pub", String, self.object_callback)
         self.sub_desire_uv=rospy.Subscriber("/desire_data_pub", String, self.desire_callback)
         self.uv_list_buffer=[]
         self.uv_desire_list_buffer=[]
 
-    #if flag=1,use our kinematics for inverse
     def object_callback(self,msg):
         tupletemp = re.findall(r'\-?\d+\.?\d*', msg.data)
         print(int(tupletemp[0]),int(tupletemp[1]))
@@ -72,29 +72,20 @@ class VisonControl():
         #print list(pose)
         q0=Kinematic()
         # print q0.Forward(q)
-        if flag==1:
-            q_ik=q0.best_sol_for_other_py( [1.] * 6, 0, q0.Forward(q))
-        else:
-            q_ik = kdl_kin.inverse(pose)  # inverse kinematics
-        # print "----------iverse-------------------\n", q_ik
+        # if flag==1:
+        #     q_ik=q0.best_sol_for_other_py( [1.] * 6, 0, q0.Forward(q))
+        # else:
+        #     q_ik = kdl_kin.inverse(pose)  # inverse kinematics
 
-        if q_ik is not None:
-            pose_sol = kdl_kin.forward(q_ik)  # should equal pose
-            print "------------------forward ------------------\n",pose_sol
+        # if q_ik is not None:
+        #     pose_sol = kdl_kin.forward(q_ik)  # should equal pose
+        #     print "------------------forward ------------------\n",pose_sol
 
         J = kdl_kin.jacobian(q)
         #print 'J:', J
         return J,pose
-    #kx=f/px,ky=f/py
-    #sim=1,use camera default from Macine Vision Toolbox for MATLAB
+
     def get_cam_data(self):
-        if self.sim==1:
-            kx=0.008/10**(-5)
-            ky=0.008/10**(-5)
-            u0=512
-            v0=512
-            cam = {'kx': kx, 'ky': ky, "u0": u0, "desiruvv0": v0}
-            return cam
         f=open(self.califilename)
         yamldata=yaml.load(f)
         #print yamldata
@@ -108,15 +99,6 @@ class VisonControl():
         return cam
         #print yaml.load(f)
 
-
-    """ read data from yaml, here it temporary uses the list exist"""
-    def get_instrinc_param(self):
-        data = numpy.array(
-            [895.957338, 0.000000, 333.621431, 0.000000, 895.348321, 241.448886, 0.000000, 0.000000, 1.000000])
-        instrinc_param = data.reshape((3, 3))
-       # print(instrinc_param)
-        return instrinc_param
-
     #cal image jacbian
     def vis2jac(self,uv,z):
         cam=self.get_cam_data()
@@ -124,8 +106,6 @@ class VisonControl():
         camf=0.6240429#m
         kx = cam['kx']
         ky = cam['ky']
-        #--------------sgl-------------
-        # print kx
         arfx=kx/camf
         arfy=ky/camf
         # kx=arfx*camf
@@ -135,8 +115,7 @@ class VisonControl():
         L=[[-arfx/z,0,uba/z,1/arfx*uba*vba,-(arfx**2+uba**2)/arfx,vba,0,-arfy/z,vba/z,(arfy**2+vba**2)/arfy,-uba*vba/arfx,-uba]]
         J=numpy.array(L).reshape((2,6))
         return J
-    #uv more than one
-    #,uv = [[672, 672], [632, 662]]
+
     def vis2jac_mt1(self,uvm,z):
         if len(uvm)>1:
             L=self.vis2jac(uvm[0],z)
@@ -165,23 +144,39 @@ class VisonControl():
     #只需要xy,z轴旋转
     def get_cam_vdot_wz(self, uvm, z, desireuv,nowuv):
         J = self.vis2jac_mt1(uvm, z)
-        print "J:", J
+        print("J:", J)
         JJ = numpy.linalg.pinv(J)  # pseduo inverse of jacobian
 
         feature_error = self.get_feature_error( desireuv, nowuv )
         # print "e:", feature_error
-        print "JJ:", JJ
+        print("JJ:", JJ)
         vdot = self.lambda1 * np.dot(JJ, feature_error.T)
-        print "vdot:", vdot
+        print("vdot:", vdot)
         v_list = vdot.reshape((1, 6)).tolist()[0]
         flag_list = [1, 0, -1, 1, 1, 1]  # [z,x,y,wx,wz,wy ]
         vdot_z = [1.0 * v_list[i] * flag_list[i] for i in range(6)]
         # vdot_z = v_list[:2] + [0, 0, 0]
         # vdot_z.append( v_list[-1] )
-        print "vdot_z:", vdot_z
+        print("vdot_z:", vdot_z)
         return np.matrix(vdot_z).T
-    #samebody tranlasition to jacbian
-    #joint speed (q0dot,q1dot,q2dot,q3dot,q4dot,q5dot)
+    def get_X_from_ar_quaternion(self,ar_info):
+        transition_L = np.array(ar_info[:3]).T
+        # print transition_L
+        rot = ar_info[3:6]
+        s = ar_info[6]
+        q0 = Q.quaternion(s, np.mat(rot))
+        print("q02R--------\n",q0.r())
+        # print q0.r()
+        T_part1 = np.column_stack((q0.r(), transition_L))
+        # print T_part1
+        T_part2 = np.array([0, 0, 0, 1])
+        # print T_part2
+        T = np.row_stack((T_part1, T_part2))
+        # print T
+        T = T.tolist()
+        T = T[0] + T[1] + T[2] + T[3]
+        # print("T:" , T)
+        return T
     def get_ur_X(self,):
         ar_info = [
             # translation: 
@@ -193,42 +188,12 @@ class VisonControl():
             0.00435505650847,
             -0.694984883822,
             0.0600017909651
-            # # translation: 
-            # 0.0222719183258,
-            # 0.0171107942898,
-            # -0.0194107217592,
-            # # rotation: 
-            # -0.00467735758937,
-            # 0.0490363918043,
-            # 0.998636806095,
-            # 0.0172651126994
-
-            # translation: 
-            # x: 
-            # -0.0685098578055,
-            # # y: 
-            # -0.00633864068603,
-            # # z: 
-            # -0.0722863094813,
-            # # rotation: 
-            # # x: 
-            # 0.513918443413,
-            # # y: 
-            # 0.511372830827,
-            # # z: 
-            # 0.491751821982,
-            # # w: 
-            # 0.482250771891
         ]
-        aa=get_X_from_ar_quaternion(ar_info)
+        aa=self.get_X_from_ar_quaternion(ar_info)
         aa=np.mat(aa)
-        print "X",aa.reshape((4,4))
+        print("X",aa.reshape((4,4)))
         return aa.reshape((4, 4))
-    def get_joint_speed_bk(self,uvm,z,desireuv,nowuv,q):
-        #1,get base to ee jacabian
-        Jacabian_joint,T_06=self.get_jacabian_from_joint(self.urdfname,q,0)
-        #2,get ee(AX=XB) to camera frame jacabian
-        X=self.get_ur_X()#numpu array248
+
     def get_joint_speed(self,uvm,z,desireuv,nowuv,q):
         #1,get base to ee jacabian
         Jacabian_joint,T_06=self.get_jacabian_from_joint(self.urdfname,q,0)
@@ -243,14 +208,14 @@ class VisonControl():
         #get ee speed
         #print "tr2jac-----\n",jac
         cam_speed = self.get_cam_vdot(uvm, z, desireuv, nowuv)
-        print "cam_speed--------",cam_speed
+        print("cam_speed--------",cam_speed)
         ee_speed_in_eeframe = np.dot(inv_X_jac, cam_speed)
         v_list = ee_speed_in_eeframe.reshape((1, 6)).tolist()[0]
         #[z,y,]
         flag_list = [0, 1, 1, 0, 0, 0]
         vdot_z = [1.0 * v_list[i] * flag_list[i] for i in range(6)]
         ee_speed_in_base = np.dot(jac_b2e.I, numpy.mat(vdot_z).T)
-        print "ee_speed-----before changing--------",ee_speed_in_base
+        print("ee_speed-----before changing--------",ee_speed_in_base)
 
         print("ee_speed_after--------------\n",vdot_z)
         j_speed=numpy.dot(Jacabian_joint.I,ee_speed_in_base)
@@ -275,7 +240,7 @@ class VisonControl():
         else:
             return False
     def return_error_ok_desire(self,feature_error_x,feature_error_y):
-        if abs(feature_error_x) <=15 and abs(feature_error_y)<=15:
+        if abs(feature_error_x) <=5 and abs(feature_error_y)<=5:
             return True
         else:
             return False
@@ -318,24 +283,12 @@ class VisonControl():
             lista.append((temp,i))
             listcc.append(temp)
         return listcc
-    def image_space_planning(self,one_corner_point,offset_data,h_line_num,v_line_num):
-        """
-        Right down corner
-        """
-        result_data=[]
-        for i in range(v_line_num):
-            for j in range(h_line_num):
-
-                result_data.append([one_corner_point[0]-(i+2)*1/2*offset_data[0],one_corner_point[1]-(j+2)*1/2*offset_data[1]])
-        return result_data
-       
 
 def main():
-    urdfname="/data/ros/yue_ws_201903/src/tcst_pkg/urdf/ur5.urdf"
-    filename="/data/ros/yue_ws_201903/src/tcst_pkg/yaml/cam_300_industry_20200518.yaml"
+    urdfname="/data/ros/yue_ws_2020/src/tcst_pkg/urdf/ur5.urdf"
+    filename="/data/ros/yue_ws_2020/src/tcst_pkg/yaml/cam_300_industry_20200518.yaml"
     # urdfname="/data/ros/ur_ws/src/universal_robot/ur_description/urdf/ur5.urdf"
     desiruv=[]
-    # desiruv=[[230,290]]
     lambda1=-2.666666
     detat=0.05
     z=0.92
@@ -343,7 +296,7 @@ def main():
     vel=0.1
     urt=0
     ratet=10
-    p0=VisonControl(filename,0,lambda1,urdfname)
+    p0=IBVSControl(filename,lambda1,urdfname)
 
     ur_reader = Urposition()
     ur_sub = rospy.Subscriber("/joint_states", JointState, ur_reader.callback)
@@ -381,9 +334,7 @@ def main():
                 print "###########################################################"
 
                 desiruv.append([333,241])
-                # desiruv.append([550,339])
 
-                #get error
                 print "##############################################################"
                 feature_error=p0.get_feature_error(desiruv,uvlist[0])
                 print "Ibvs is ok?---",p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])
@@ -439,76 +390,72 @@ def main():
 
         if open_go_desire_flag==1 and open_ibvs_flag==0:
             if len(p0.uv_desire_list_buffer)!=0:
-                            # desire_object=p0.image_space_planning([569,474],[44,65],3,3)
-                            uvlist.append([p0.uv_desire_list_buffer[-1][0]+70,p0.uv_desire_list_buffer[-1][1]+55])
-                            # uvlist.append([313,212])
-                            print "##############################################################"
-                            print "uv-list------\n",uvlist
-                            print "###########################################################"
+                # desire_object=p0.image_space_planning([569,474],[44,65],3,3)
+                uvlist.append([p0.uv_desire_list_buffer[-1][0]+70,p0.uv_desire_list_buffer[-1][1]+55])
+                # uvlist.append([313,212])
+                print "##############################################################"
+                print "uv-list------\n",uvlist
+                print "###########################################################"
 
-                            desiruv.append([333,241])
-                            # desiruv.append([550,339])
+                desiruv.append([333,241])
+                # desiruv.append([550,339])
 
-                            #get error
-                            print "##############################################################"
-                            feature_error=p0.get_feature_error(desiruv,uvlist[0])
-                            print "Ibvs is ok?---",p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])
-                            if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==False:
-                                print "feature error\n",feature_error
-                                u_error_pub.publish(feature_error.tolist()[0][0])
-                                v_error_pub.publish(feature_error.tolist()[0][1])
-                                print "##############################################################"
+                #get error
+                print "##############################################################"
+                feature_error=p0.get_feature_error(desiruv,uvlist[0])
+                print "Ibvs is ok?---",p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])
+                if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==False:
+                    print "feature error\n",feature_error
+                    u_error_pub.publish(feature_error.tolist()[0][0])
+                    v_error_pub.publish(feature_error.tolist()[0][1])
+                    print "##############################################################"
 
-                                print "camera vdot\n",p0.get_cam_vdot_wz(uvlist,z,desiruv,uvlist[0])
-                                print "##############################################################"
-                                q_now=ur_reader.ave_ur_pose
-                                #get joint speed in ee frame
-                                print "##############################################################"
-                                # print "q_now\n", q_now
-                                print "joint speed\n",p0.get_joint_speed(uvlist,z,desiruv,uvlist[0],q_now)
-                                print "deta joint angular---"
-                                detaangular=p0.get_deta_joint_angular(detat,uvlist, z, desiruv, uvlist[0], q_now)
-                                print detaangular
-                                print "##############################################################"
-                                print "joint angular----"
-                                q_pub_now=p0.get_joint_angular(q_now,detaangular)
-                                print q_pub_now
-                                print "##############################################################"
-                                print "move ur base the servo system----"
-                                print "q_now\n", q_now
-                                print "q_pub_now\n",q_pub_now
-                                down_to_q=q_pub_now
-                                ss = "movej([" + str(q_pub_now[0]) + "," + str(q_pub_now[1]) + "," + str(q_pub_now[2]) + "," + str(
-                                    q_pub_now[3]) + "," + str(q_pub_now[4]) + "," + str(q_pub_now[5]) + "]," + "a=" + str(ace) + "," + "v=" + str(
-                                    vel) + "," + "t=" + str(urt) + ")"
-                                print ss
-                                ur_pub.publish(ss)
-                            if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
-                                # rospy.set_param("/open_go_to_object",0)
-                                
+                    print "camera vdot\n",p0.get_cam_vdot_wz(uvlist,z,desiruv,uvlist[0])
+                    print "##############################################################"
+                    q_now=ur_reader.ave_ur_pose
+                    #get joint speed in ee frame
+                    print "##############################################################"
+                    # print "q_now\n", q_now
+                    print "joint speed\n",p0.get_joint_speed(uvlist,z,desiruv,uvlist[0],q_now)
+                    print "deta joint angular---"
+                    detaangular=p0.get_deta_joint_angular(detat,uvlist, z, desiruv, uvlist[0], q_now)
+                    print detaangular
+                    print "##############################################################"
+                    print "joint angular----"
+                    q_pub_now=p0.get_joint_angular(q_now,detaangular)
+                    print q_pub_now
+                    print "##############################################################"
+                    print "move ur base the servo system----"
+                    print "q_now\n", q_now
+                    print "q_pub_now\n",q_pub_now
+                    down_to_q=q_pub_now
+                    ss = "movej([" + str(q_pub_now[0]) + "," + str(q_pub_now[1]) + "," + str(q_pub_now[2]) + "," + str(
+                        q_pub_now[3]) + "," + str(q_pub_now[4]) + "," + str(q_pub_now[5]) + "]," + "a=" + str(ace) + "," + "v=" + str(
+                        vel) + "," + "t=" + str(urt) + ")"
+                    print ss
+                    ur_pub.publish(ss)
+                if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
+                    # rospy.set_param("/open_go_to_object",0)
+                    
 
-                                rospy.logerr("============go to next point [%s]============",str(count_for_desire))
-                                x_length=-0.016
-                                y_length=-0.065
-                                z_depth=-0.52
-                                p0.move_to_sucking(ur_pub,down_to_q,x_length,y_length,z_depth,0.4,ace,urt)
-                                time.sleep(2)
-                                os.system("rostopic pub /io_state std_msgs/String '55C8010055' -1")
-                                p0.move_ur(ur_pub,down_to_q,0.4,ace,urt)
-                                time.sleep(3)
-                                p0.uv_desire_list_buffer=[]
-                                rospy.set_param("open_go_desire_flag",0)
-                                p0.move_ur(ur_pub,start_angular_back,0.4,ace,urt)
-                                time.sleep(5)
-                                rospy.set_param("/open_go_to_desire",0)
-                                rospy.set_param("/open_go_to_object",1)
-                                rospy.set_param("open_ibvs_flag",1)
-                                count_for_desire+=1
-                                rospy.set_param("/choose_next_point",count_for_desire)
-
-
-            
-
+                    rospy.logerr("============go to next point [%s]============",str(count_for_desire))
+                    x_length=-0.016
+                    y_length=-0.065
+                    z_depth=-0.52
+                    p0.move_to_sucking(ur_pub,down_to_q,x_length,y_length,z_depth,0.4,ace,urt)
+                    time.sleep(2)
+                    os.system("rostopic pub /io_state std_msgs/String '55C8010055' -1")
+                    p0.move_ur(ur_pub,down_to_q,0.4,ace,urt)
+                    time.sleep(3)
+                    p0.uv_desire_list_buffer=[]
+                    rospy.set_param("open_go_desire_flag",0)
+                    p0.move_ur(ur_pub,start_angular_back,0.4,ace,urt)
+                    time.sleep(5)
+                    rospy.set_param("/open_go_to_desire",0)
+                    rospy.set_param("/open_go_to_object",1)
+                    rospy.set_param("open_ibvs_flag",1)
+                    count_for_desire+=1
+                    rospy.set_param("/choose_next_point",count_for_desire)
 
 
         rate.sleep()

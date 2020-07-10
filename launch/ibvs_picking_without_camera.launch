@@ -1,0 +1,14 @@
+<launch>
+    <!-- <node pkg="tcst_pkg" type="ioboard_node.py" name="ioboard_node" output="screen" > -->
+    
+    <!-- </node> -->
+    <param name="open_go_to_object" value="0" />
+    <param name="open_go_to_desire" value="0" />
+    <param name="open_ibvs_flag" value="0" />
+    <param name="open_go_desire_flag" value="0" />
+    <node pkg="tcst_pkg" type="yolov4_pub_box_info.py" name="yolov4_pub_box_info" output="screen" >
+    </node>
+    
+  <!-- </group> -->
+  
+</launch>
