@@ -170,7 +170,7 @@ class VisonControl():
         aa=np.mat(aa)
         # print "X",aa.reshape((4,4))
         # return aa.reshape((4, 4))
-        X=numpy.matrix([[0.0,1.0,0.0,0.0],[-1.0,0.0,0.0,+0.12],[0.0,0.0,1.0,+0.09],[0.0,0.0,0.0,1.0]])
+        X=numpy.matrix([[0.0,1.0,0.0,0.0],[-1.0,0.0,0.0,+0.12],[0.0,0.0,1.0,+0.05],[0.0,0.0,0.0,1.0]])
         return X
     def get_joint_speed(self,uvm,z,desireuv,nowuv,q):
         #1,get base to ee jacabian
@@ -294,7 +294,7 @@ def main():
         desiruv=[]
         uvlist=[]
         open_ibvs_flag=rospy.get_param("open_ibvs_flag")
-        open_go_desire_flag=rospy.get_param("open_go_desire_flag")
+        # open_go_desire_flag=rospy.get_param("open_go_desire_flag")
         open_go_to_desire=rospy.get_param("open_go_to_desire")
         # print(p0.uv_list_buffer)
         if open_ibvs_flag==1:
