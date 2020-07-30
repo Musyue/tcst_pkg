@@ -124,6 +124,7 @@ def skew(l):
 
 
 def tr2r(T):
+    # print("T",T)
     r = [ 0, 1, 2]
     c = [ 0, 1, 2]
     R1 = T[r]

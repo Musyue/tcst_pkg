@@ -13,8 +13,8 @@ from ur5_kinematics import Kinematic
 import rospy
 import yaml,os
 from trans_methods import *
-from get_arpose_from_ar import *
-from ar_track_alvar_msgs.msg import AlvarMarkers
+
+
 from hand_in_eye import *
 from std_msgs.msg import String
 from sensor_msgs.msg import JointState
@@ -42,46 +42,39 @@ class VisonControl():
                 self.uv_list_buffer.append([int(tupletemp[0]),int(tupletemp[1])])
             else:
                 self.uv_list_buffer.append([int(tupletemp[0]),int(tupletemp[1])])
-    def get_jacabian_from_joint(self,urdfname,jointq,flag):
+    def get_jacabian_from_joint(self,urdfname,q,flag):
         #robot = URDF.from_xml_file("/data/ros/ur_ws/src/universal_robot/ur_description/urdf/ur5.urdf")
         robot = URDF.from_xml_file(urdfname)
         tree = kdl_tree_from_urdf_model(robot)
         # print tree.getNrOfSegments()
-        chain = tree.getChain("base_link", "ee_link")
+        chain = tree.getChain("base_link", "tool0")
         # print chain.getNrOfJoints()
         # forwawrd kinematics
-        kdl_kin = KDLKinematics(robot, "base_link", "ee_link")
-        q=jointq
+        kdl_kin = KDLKinematics(robot, "base_link", "tool0")
+        # print(q)
         #q = [0, 0, 1, 0, 1, 0]
         pose = kdl_kin.forward(q)  # forward kinematics (returns homogeneous 4x4 matrix)
-        # print "pose-----"
+        print "pose-----",pose
         # print(pose)
         #print list(pose)
-        q0=Kinematic()
-        # print q0.Forward(q)
-        if flag==1:
-            q_ik=q0.best_sol_for_other_py( [1.] * 6, 0, q0.Forward(q))
-        else:
-            q_ik = kdl_kin.inverse(pose)  # inverse kinematics
+        # q0=Kinematic()
+        # print(q0.Forward(q))
+        # if flag==1:
+        #     q_ik=q0.best_sol_for_other_py( [1.] * 6, 0, q0.Forward(q))
+        # else:
+        #     q_ik = kdl_kin.inverse(pose)  # inverse kinematics
         # print "----------iverse-------------------\n", q_ik
 
-        if q_ik is not None:
-            pose_sol = kdl_kin.forward(q_ik)  # should equal pose
-            print "------------------forward ------------------\n",pose_sol
-
+        # if q_ik is not None:
+        #     pose_sol = kdl_kin.forward(q_ik)  # should equal pose
+        #     print "------------------forward ------------------\n",pose_sol
         J = kdl_kin.jacobian(q)
-        #print 'J:', J
+        print('kdl J:', J)
         return J,pose
     #kx=f/px,ky=f/py
     #sim=1,use camera default from Macine Vision Toolbox for MATLAB
     def get_cam_data(self):
-        if self.sim==1:
-            kx=0.008/10**(-5)
-            ky=0.008/10**(-5)
-            u0=512
-            v0=512
-            cam = {'kx': kx, 'ky': ky, "u0": u0, "desiruvv0": v0}
-            return cam
+    
         f=open(self.califilename)
         yamldata=yaml.load(f)
         #print yamldata
@@ -94,15 +87,6 @@ class VisonControl():
         cam = {'kx': kx, 'ky': ky, "u0": u0, "v0": v0}
         return cam
         #print yaml.load(f)
-
-
-    """ read data from yaml, here it temporary uses the list exist"""
-    def get_instrinc_param(self):
-        data = numpy.array(
-            [895.957338, 0.000000, 333.621431, 0.000000, 895.348321, 241.448886, 0.000000, 0.000000, 1.000000])
-        instrinc_param = data.reshape((3, 3))
-       # print(instrinc_param)
-        return instrinc_param
 
     #cal image jacbian
     def vis2jac(self,uv,z):
@@ -180,50 +164,24 @@ class VisonControl():
             0.00435505650847,
             -0.694984883822,
             0.0600017909651
-            # # translation: 
-            # 0.0222719183258,
-            # 0.0171107942898,
-            # -0.0194107217592,
-            # # rotation: 
-            # -0.00467735758937,
-            # 0.0490363918043,
-            # 0.998636806095,
-            # 0.0172651126994
 
-            # translation: 
-            # x: 
-            # -0.0685098578055,
-            # # y: 
-            # -0.00633864068603,
-            # # z: 
-            # -0.0722863094813,
-            # # rotation: 
-            # # x: 
-            # 0.513918443413,
-            # # y: 
-            # 0.511372830827,
-            # # z: 
-            # 0.491751821982,
-            # # w: 
-            # 0.482250771891
         ]
         aa=get_X_from_ar_quaternion(ar_info)
         aa=np.mat(aa)
-        print "X",aa.reshape((4,4))
-        return aa.reshape((4, 4))
-    def get_joint_speed_bk(self,uvm,z,desireuv,nowuv,q):
-        #1,get base to ee jacabian
-        Jacabian_joint,T_06=self.get_jacabian_from_joint(self.urdfname,q,0)
-        #2,get ee(AX=XB) to camera frame jacabian
-        X=self.get_ur_X()#numpu array248
+        # print "X",aa.reshape((4,4))
+        # return aa.reshape((4, 4))
+        X=numpy.matrix([[0.0,1.0,0.0,0.0],[-1.0,0.0,0.0,+0.12],[0.0,0.0,1.0,+0.09],[0.0,0.0,0.0,1.0]])
+        return X
     def get_joint_speed(self,uvm,z,desireuv,nowuv,q):
         #1,get base to ee jacabian
         Jacabian_joint,T_06=self.get_jacabian_from_joint(self.urdfname,q,0)
+        print(q)
         #2,get ee(AX=XB) to camera frame jacabian
         X=self.get_ur_X()#numpu array
         ebT=T_06
         #tr2jac
         jac = tr2jac(X,1)
+
         jac_b2e=tr2jac(T_06,0)
         #print "------X",X
         inv_X_jac = jac.I
@@ -234,7 +192,8 @@ class VisonControl():
         ee_speed_in_eeframe = np.dot(inv_X_jac, cam_speed)
         v_list = ee_speed_in_eeframe.reshape((1, 6)).tolist()[0]
         #[z,y,]
-        flag_list = [0, 1, 1, 0, 0, 0]
+        # flag_list = [0, 1, 1, 0, 0, 0]
+        flag_list = [1, 1, 1, 0, 0, 0]
         vdot_z = [1.0 * v_list[i] * flag_list[i] for i in range(6)]
         ee_speed_in_base = np.dot(jac_b2e.I, numpy.mat(vdot_z).T)
         print "ee_speed-----before changing--------",ee_speed_in_base
@@ -301,8 +260,8 @@ class VisonControl():
             listcc.append(temp)
         return listcc
 def main():
-    urdfname="/data/ros/yue_ws_201903/src/tcst_pkg/urdf/ur5.urdf"
-    filename="/data/ros/yue_ws_201903/src/tcst_pkg/yaml/cam_300_industry_20200518.yaml"
+    urdfname="/data/ros/yue_ws/src/tcst_pkg/urdf/ur5.urdf"
+    filename="/data/ros/yue_ws/src/tcst_pkg/yaml/cam_300_industry_20200518.yaml"
     # urdfname="/data/ros/ur_ws/src/universal_robot/ur_description/urdf/ur5.urdf"
     desiruv=[]
     # desiruv=[[230,290]]
@@ -325,8 +284,8 @@ def main():
     ur_pub = rospy.Publisher("/ur_driver/URScript", String, queue_size=10)
 
     down_to_q=[]
-    desire_joint_angular=[53.57,-103.22,-71.04,-96.31,91.8,133.87]
-    start_angular=[6.15,-95.53,-80.33,-94.89,92.00,177.78]
+    desire_joint_angular=[124.08,-86.65,60.29,295.00,-89.38,166.73]
+    start_angular=[44.87,-70.67,40.06,299.46,-89.69,175.71]
     cartisian_feedback=p0.getpi(desire_joint_angular)
     start_angular_back=p0.getpi(start_angular)
     rate = rospy.Rate(ratet)
@@ -365,7 +324,7 @@ def main():
                     q_now=ur_reader.ave_ur_pose
                     #get joint speed in ee frame
                     print "##############################################################"
-                    # print "q_now\n", q_now
+                    print "q_now\n", q_now
                     print "joint speed\n",p0.get_joint_speed(uvlist,z,desiruv,uvlist[0],q_now)
                     print "deta joint angular---"
                     detaangular=p0.get_deta_joint_angular(detat,uvlist, z, desiruv, uvlist[0], q_now)
@@ -384,40 +343,41 @@ def main():
                         vel) + "," + "t=" + str(urt) + ")"
                     print ss
                     ur_pub.publish(ss)
+                    #cable is x negtive
                 if p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
                     rospy.set_param("/open_go_to_object",0)
-                    x_length=-0.09
-                    y_length=+0.035
-                    z_depth=-0.41
+                    x_length=+0.112
+                    y_length=+0.04#-0.005
+                    z_depth=-0.31
                     # down_to_q=[0.6840241781464097, -1.7849443418136726, -1.2719627004551626, -1.671977857427553, 1.6020880964542237, 2.9842358676782488]
                     if len(down_to_q)!=0:
                         p0.move_to_sucking(ur_pub,down_to_q,x_length,y_length,z_depth,0.4,ace,urt)
-                        time.sleep(1)
-                        os.system("rostopic pub /io_state std_msgs/String '55C8010155' -1")
+                        time.sleep(4)
+                        # os.system("rostopic pub /io_state std_msgs/String '55C8010155' -1")
                         p0.move_ur(ur_pub,down_to_q,0.4,ace,urt)
                         time.sleep(3)
-                        p0.move_ur(ur_pub,cartisian_feedback,0.4,ace,urt)
-                        time.sleep(5)
-                        rospy.set_param("open_ibvs_flag",0)
-                        rospy.set_param("open_go_desire_flag",1)
-                        rospy.set_param("/open_go_to_desire",1)
+                        # p0.move_ur(ur_pub,cartisian_feedback,0.4,ace,urt)
+                        # time.sleep(5)
+                        # rospy.set_param("open_ibvs_flag",0)
+                        # rospy.set_param("open_go_desire_flag",1)
+                        # rospy.set_param("/open_go_to_desire",1)
 
-        if open_go_desire_flag==1 and open_ibvs_flag==0:
-            p0.uv_list_buffer=[]
-            rospy.set_param("open_ibvs_flag",1)
-            rospy.set_param("open_go_desire_flag",0)
-            rospy.set_param("/open_go_to_object",1)
-            rospy.set_param("/open_go_to_desire",0)
-            x_length=0
-            y_length=0
-            z_depth=-0.58
-            p0.move_to_sucking(ur_pub,cartisian_feedback,x_length,y_length,z_depth,0.4,ace,urt)
-            time.sleep(2)
-            os.system("rostopic pub /io_state std_msgs/String '55C8010055' -1")
-            p0.move_ur(ur_pub,cartisian_feedback,0.4,ace,urt)
-            time.sleep(3)
-            p0.move_ur(ur_pub,start_angular_back,0.4,ace,urt)
-            time.sleep(5)
+        # if open_go_desire_flag==1 and open_ibvs_flag==0:
+        #     p0.uv_list_buffer=[]
+        #     rospy.set_param("open_ibvs_flag",1)
+        #     rospy.set_param("open_go_desire_flag",0)
+        #     rospy.set_param("/open_go_to_object",1)
+        #     rospy.set_param("/open_go_to_desire",0)
+        #     x_length=0
+        #     y_length=0
+        #     z_depth=-0.58
+        #     p0.move_to_sucking(ur_pub,cartisian_feedback,x_length,y_length,z_depth,0.4,ace,urt)
+        #     time.sleep(2)
+        #     os.system("rostopic pub /io_state std_msgs/String '55C8010055' -1")
+        #     p0.move_ur(ur_pub,cartisian_feedback,0.4,ace,urt)
+        #     time.sleep(3)
+        #     p0.move_ur(ur_pub,start_angular_back,0.4,ace,urt)
+        #     time.sleep(5)
             
 
 

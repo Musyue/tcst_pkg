@@ -39,13 +39,18 @@ def main():
         # ace=1.4
         qq=[
             # [6.15,-95.53,-80.33,-94.89,92.00,177.78]
-            [55.44,-97.74,-77.52,-95.14,91.78,135.72]
+            # [55.44,-97.74,-77.52,-95.14,91.78,135.72]
+            # [131.12,-87.23,61.08,294.70,-89.59,173.75],#goal,
+
+            [44.87,-70.67,40.06,299.46,-89.69,182.71]#start
             ]
         for ii in range(len(qq)):
             qt=change_angle_to_pi(qq[ii])
-            moveur(pub, qt,ace,vel,t)
+            # qt=[0.7024339580432882, -1.1993113429190734, 0.6491743365862221, 5.236692470485026, -1.5631476047642547, 2.983893646312892]
+            moveur(pub,qt,ace,vel,t)
+
             rospy.loginfo("start "+str(ii)+" ur position-----")
-            time.sleep(3)
+            time.sleep(5)
         rospy.loginfo("after while------")
         rate.sleep()
         # rospy.spin()

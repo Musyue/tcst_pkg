@@ -131,7 +131,7 @@ class IBVSControl():
         #1,get base to ee jacabian
         Jacabian_joint,T_06=self.get_jacabian_from_joint(self.urdfname,q,0)
         #2,get ee(AX=XB) to camera frame jacabian
-        X=numpy.matrix([[0.0,1.0,0.0,0.0],[-1.0,0.0,0.0,+0.12],[0.0,0.0,1.0,+0.098],[0.0,0.0,0.0,1.0]])
+        X=X=numpy.matrix([[0.0,1.0,0.0,0.0],[-1.0,0.0,0.0,+0.12],[0.0,0.0,1.0,+0.098],[0.0,0.0,0.0,1.0]])
         ebT=T_06
         #tr2jac
         jac = tr2jac(X,1)
@@ -141,7 +141,7 @@ class IBVSControl():
         #get ee speed
         #print "tr2jac-----\n",jac
         cam_speed = self.get_cam_vdot(uvm, z, desireuv, nowuv)
-        # print("cam_speed--------",cam_speed)
+        print("cam_speed--------",cam_speed)
         ee_speed_in_eeframe = np.dot(inv_X_jac, cam_speed)
         v_list = ee_speed_in_eeframe.reshape((1, 6)).tolist()[0]
         #[z,y,]
@@ -152,13 +152,21 @@ class IBVSControl():
 
         # print("ee_speed_after--------------\n",vdot_z)
         j_speed=numpy.dot(Jacabian_joint.I,ee_speed_in_base)
-        # print(j_speed.tolist())
-        j_list_speed=[]
-        for i in range(len(j_speed)):
-           j_list_speed.append(j_speed.tolist()[i][0])
-
-        return j_list_speed,j_speed
-
+        return j_speed
+    #
+    def get_deta_joint_angular(self,detat,uvm,z,desireuv,nowuv,q):
+        j_speed=self.get_joint_speed(uvm,z,desireuv,nowuv,q)
+        #print j_speed
+        joint_angular=float(detat)*numpy.array(j_speed)
+        #print '-------joint_angular-----\n',joint_angular
+        return joint_angular
+    def get_joint_angular(self,qnow,detajoint):
+        #result=[]
+        listangular=[]
+        for i in range(len(detajoint.tolist())):
+            listangular.append(detajoint.tolist()[i][0]+qnow[i])
+        # print "list",detajoint.tolist()
+        return listangular
     def return_error_ok(self,feature_error_x,feature_error_y):
         if abs(feature_error_x) <=5 and abs(feature_error_y)<=5:
             return True
@@ -192,10 +200,6 @@ class IBVSControl():
         ss = "movej([" + str(q_pub_now[0]) + "," + str(q_pub_now[1]) + "," + str(q_pub_now[2]) + "," + str(q_pub_now[3]) + "," + str(q_pub_now[4]) + "," + str(q_pub_now[5]) + "]," + "a=" + str(ace) + "," + "v=" + str(vel) + "," + "t=" + str(urt) + ")"
         rospy.loginfo(ss)
         ur_pub.publish(ss)
-    def urscript_speedj_pub(self, pub , vel, ace,t):
-        ss = "speedj([" + str(vel[0]) + "," + str(vel[1]) + "," + str(vel[2]) + "," + str(vel[3]) + "," + str(
-            vel[4]) + "," + str(vel[5]) + "]," + "a=" + str(ace) + "," + "t=" + str(t) + ")"
-        pub.publish(ss)
     def move_ur_l(self,ur_pub,pub_now,ace,vel,t):
         q=pub_now
         ss="movel(["+str(q[0])+","+str(q[1])+","+str(q[2])+","+str(q[3])+","+str(q[4])+","+str(q[5])+"]," +"a="+str(ace)+","+"v="+str(vel)+","+"t="+str(t)+")"
@@ -219,8 +223,8 @@ class IBVSControl():
             x_length=0.035
             y_length=0.035
         else:
-            x_length=0.04
-            y_length=0.04
+            x_length=0.058
+            y_length=0.058
         depth=0
         pos0=self.get_inverse_to_box(pub_now,x_length,y_length,depth)
         final.update({0:pos0})
@@ -231,26 +235,25 @@ class IBVSControl():
         pos1=self.get_inverse_to_box(pos0,x_length,y_length,depth)
         final.update({1:pos1})
 
-        x_length=0.096
-        y_length=0.096
+        x_length=0.099
+        y_length=0.099
         depth=0
         pos2=self.get_inverse_to_box(pos1,x_length,y_length,depth)
         final.update({2:pos2})
 
-        x_length=0.081
-        y_length=0.081
+        x_length=0.0899
+        y_length=0.0899
         depth=0
         pos3=self.get_inverse_to_box(pos2,x_length,y_length,depth)
         final.update({3:pos3})
-
-        x_length=0.063
-        y_length=-0.063
+        x_length=0.066
+        y_length=-0.066
         depth=0
         pos4=self.get_inverse_to_box(pos1,x_length,y_length,depth)
         final.update({4:pos4}) 
 
-        x_length=0.053
-        y_length=-0.053
+        x_length=0.0699
+        y_length=-0.0699
         depth=0
         pos5=self.get_inverse_to_box(pos4,x_length,y_length,depth)
         final.update({5:pos5})   
@@ -281,18 +284,13 @@ def main():
     filename="/data/ros/yue_ws/src/tcst_pkg/yaml/cam_300_industry_20200518.yaml"
     # urdfname="/data/ros/ur_ws/src/universal_robot/ur_description/urdf/ur5.urdf"
     desiruv=[]
-
-    lambda1=-0.796666
-
+    lambda1=-1.166666
     detat=0.05
     z=0.92
-
     ace=50
-    ace_ml=1
     vel=0.1
-    
-    ratet=50
     urt=0
+    ratet=10
     p0=IBVSControl(filename,lambda1,urdfname)
 
     ur_reader = Urposition()
@@ -305,7 +303,7 @@ def main():
     ur_pub = rospy.Publisher("/ur_driver/URScript", String, queue_size=10)
 
     down_to_q=[]
-    desire_joint_angular=[131.12,-87.23,61.08,294.70,-89.59,173.75]
+    desire_joint_angular=[124.08,-86.65,60.29,295.00,-89.38,166.73]
     start_angular=[44.87,-70.67,40.06,299.46,-89.69,182.71]
     cartisian_feedback=p0.getpi(desire_joint_angular)
     start_angular_back=p0.getpi(start_angular)
@@ -314,14 +312,12 @@ def main():
     
     count_for_desire=0
     place_count=2
-    box_count_temp=0
     while not rospy.is_shutdown():
         
         desiruv=[]
         uvlist=[]
         open_ibvs_flag=rospy.get_param("open_ibvs_flag")
         open_go_to_desire=rospy.get_param("open_go_to_desire")
-        box_count=rospy.get_param("box_count")
         print("open_ibvs_flag,open_go_to_desire",open_ibvs_flag,open_go_to_desire)
         # print(p0.uv_list_buffer)
         if open_ibvs_flag==1:
@@ -333,116 +329,120 @@ def main():
                 desiruv.append([333,241])
 
                 feature_error=p0.get_feature_error(desiruv,uvlist[0])
-                rospy.logerr("Ibvs is ok?---"+str(p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])))
+                print "Ibvs is ok?---",p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])
                 if p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==False:
-                    rospy.loginfo("feature error\n"+str(feature_error))
+                    print "feature error\n",feature_error
                     u_error_pub.publish(feature_error.tolist()[0][0])
                     v_error_pub.publish(feature_error.tolist()[0][1])
 
                     q_now=ur_reader.ave_ur_pose
-                    j_list_speed,j_speed=p0.get_joint_speed(uvlist, z, desiruv, uvlist[0], q_now)#uvm,z,desireuv,nowuv,q
-                    rospy.logerr("Speed---"+str(j_list_speed))
-                    p0.urscript_speedj_pub(ur_pub ,j_list_speed, ace, 1.0 / ratet)
+                    detaangular=p0.get_deta_joint_angular(detat,uvlist, z, desiruv, uvlist[0], q_now)
 
-                    down_to_q=q_now
-                    rospy.loginfo("Object q now"+str(q_now))
+                    q_pub_now=p0.get_joint_angular(q_now,detaangular)
 
-
+                    print "q_now\n", q_now
+                    print "q_pub_now\n",q_pub_now
+                    down_to_q=q_pub_now
+                    ss = "movej([" + str(q_pub_now[0]) + "," + str(q_pub_now[1]) + "," + str(q_pub_now[2]) + "," + str(
+                        q_pub_now[3]) + "," + str(q_pub_now[4]) + "," + str(q_pub_now[5]) + "]," + "a=" + str(ace) + "," + "v=" + str(
+                        vel) + "," + "t=" + str(urt) + ")"
+                    ur_pub.publish(ss)
                 if p0.return_error_ok(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
                     rospy.set_param("/open_go_to_object",0)
+                    # down_to_q=[0.6840241781464097, -1.7849443418136726, -1.2719627004551626, -1.671977857427553, 1.6020880964542237, 2.9842358676782488]
                     if len(down_to_q)!=0:
                         temp_q0=p0.get_inverse_to_box(down_to_q,0,0,-0.15)
-                        p0.move_ur_l(ur_pub,temp_q0,0.05,ace_ml,urt)
-                        time.sleep(2.5) 
-                        x_length=+0.11
+                        p0.move_ur_l(ur_pub,temp_q0,0.2,ace,urt)
+                        time.sleep(1) 
+                        x_length=+0.112
                         y_length=+0.04#-0.005
                         z_depth=0
                         temp_q1=p0.get_inverse_to_box(temp_q0,x_length,y_length,z_depth)
-                        p0.move_ur_l(ur_pub,temp_q1,0.05,ace_ml,urt)
-                        time.sleep(2)
-                        temp_q3=p0.get_inverse_to_box(temp_q1,0,0,-0.19)
-                        p0.move_ur_l(ur_pub,temp_q3,0.2,ace_ml,urt)
-                        time.sleep(1)     
-
+                        p0.move_ur_l(ur_pub,temp_q1,0.2,ace,urt)
+                        time.sleep(1)
+                        x_length=+0.002
+                        y_length=+0.002#-0.005
+                        depth=0
+                        temp_q2=p0.get_inverse_to_box(temp_q1,x_length,y_length,depth)
+                        p0.move_ur_l(ur_pub,temp_q2,0.2,ace,urt)
+                        time.sleep(1)
+                        temp_q3=p0.get_inverse_to_box(temp_q2,0,0,-0.19)
+                        p0.move_ur_l(ur_pub,temp_q3,0.2,ace,urt)
+                        time.sleep(1)                     
                         os.system("rostopic pub /io_state std_msgs/String '55C8010155' -1")
-
-                        p0.move_ur_l(ur_pub,temp_q1,0.1,ace_ml,urt)
-                        time.sleep(1.5)
-
+                        p0.move_ur_l(ur_pub,temp_q2,0.2,ace,urt)
+                        time.sleep(1)
                         p0.move_ur_l(ur_pub,cartisian_feedback,0.2,ace,urt)
                         time.sleep(5)
                         rospy.set_param("open_ibvs_flag",0)
-                        box_count_temp+=1
-                        rospy.set_param("/box_count",box_count_temp)
-                        rospy.set_param("/open_go_to_desire",1)
 
+                        rospy.set_param("/open_go_to_desire",1)
                         uvlist=[]
                         p0.uv_list_buffer=[]
 
-        if open_go_to_desire==1 and open_ibvs_flag==0:
-            print("Desire pick",len(p0.uv_desire_list_buffer))
-            if len(p0.uv_desire_list_buffer)!=0:
-                # desire_object=p0.image_space_planning([569,474],[44,65],3,3)
-                uvlist.append([p0.uv_desire_list_buffer[-1][0],p0.uv_desire_list_buffer[-1][1]])
-                desiruv.append([333,241])
-                # desiruv.append([550,339])
+        # if open_go_to_desire==1 and open_ibvs_flag==0:
+        #     print("Desire pick",len(p0.uv_desire_list_buffer))
+        #     if len(p0.uv_desire_list_buffer)!=0:
+        #         # desire_object=p0.image_space_planning([569,474],[44,65],3,3)
+        #         uvlist.append([p0.uv_desire_list_buffer[-1][0],p0.uv_desire_list_buffer[-1][1]])
+        #         desiruv.append([333,241])
+        #         # desiruv.append([550,339])
 
-                feature_error=p0.get_feature_error(desiruv,uvlist[0])
-                rospy.logerr("Desire Ibvs is ok?---"+str(p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])))
-                if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==False:
-                    rospy.loginfo("feature error\n"+str(feature_error))
-                    u_error_pub.publish(feature_error.tolist()[0][0])
-                    v_error_pub.publish(feature_error.tolist()[0][1])
+        #         feature_error=p0.get_feature_error(desiruv,uvlist[0])
+        #         print "Ibvs is ok?---",p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])
+        #         if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==False:
+        #             print "feature error\n",feature_error
+        #             u_error_pub.publish(feature_error.tolist()[0][0])
+        #             v_error_pub.publish(feature_error.tolist()[0][1])
 
-                    q_now=ur_reader.ave_ur_pose
-                    j_list_speed,j_speed=p0.get_joint_speed(uvlist, z, desiruv, uvlist[0], q_now)#uvm,z,desireuv,nowuv,q
-                    rospy.logerr("Speed---"+str(j_list_speed))
-                    p0.urscript_speedj_pub(ur_pub ,j_list_speed, ace, 1.0 / ratet)
-                    rospy.loginfo("Desire q now"+str(q_now))
-                    down_to_q=q_now
+        #             q_now=ur_reader.ave_ur_pose
 
-                if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
-                    depth=-0.20
-                    temp_q=p0.get_inverse_to_box(down_to_q,0,0,depth)
-                    p0.move_ur_l(ur_pub,temp_q,0.1,ace,urt)
-                    time.sleep(2)
-                    if place_count>=4:
-                        pose_place=p0.caculate_place_pose_from_ref(temp_q,0)
-                    else:
-                        pose_place=p0.caculate_place_pose_from_ref(temp_q,1)
-                    rospy.set_param("/open_go_to_object",0)
-                    if place_count>=4:
-                        p0.move_ur_l(ur_pub,pose_place[0],0.05,ace,urt)
-                        time.sleep(2.5)
-                    # p0.move_ur_l(ur_pub,pose_place[1],0.05,ace,urt)
-                    # time.sleep(2.5)
-                    p0.move_ur_l(ur_pub,pose_place[place_count],0.05,ace,urt)
-                    time.sleep(2.5)
+        #             detaangular=p0.get_deta_joint_angular(detat,uvlist, z, desiruv, uvlist[0], q_now)
 
-                    temp_q_place=p0.get_inverse_to_box(pose_place[place_count],0,0,-0.39)
-                    p0.move_ur_l(ur_pub,temp_q_place,0.2,ace,urt)
-                    time.sleep(3) 
-                    temp_q_push=p0.get_inverse_to_box(temp_q_place,-0.025,-0.025,0)
-                    p0.move_ur_l(ur_pub,temp_q_push,0.1,ace,urt)
-                    time.sleep(1.5) 
-                    temp_q_push1=p0.get_inverse_to_box(temp_q_push,-0.02,0.02,0)
-                    p0.move_ur_l(ur_pub,temp_q_push1,0.1,ace,urt)
-                    time.sleep(1)
-                    os.system("rostopic pub /io_state std_msgs/String '55C8010055' -1")   
+        #             q_pub_now=p0.get_joint_angular(q_now,detaangular)
+        #             print "q_now\n", q_now
+        #             print "q_pub_now\n",q_pub_now
+        #             down_to_q=q_pub_now
+        #             ss = "movej([" + str(q_pub_now[0]) + "," + str(q_pub_now[1]) + "," + str(q_pub_now[2]) + "," + str(
+        #                 q_pub_now[3]) + "," + str(q_pub_now[4]) + "," + str(q_pub_now[5]) + "]," + "a=" + str(ace) + "," + "v=" + str(
+        #                 vel) + "," + "t=" + str(urt) + ")"
+        #             # print ss
+        #             ur_pub.publish(ss)
+        #         if p0.return_error_ok_desire(feature_error.tolist()[0][0],feature_error.tolist()[0][1])==True:
+        #             depth=-0.15
+        #             temp_q=p0.get_inverse_to_box(down_to_q,0,0,depth)
+        #             p0.move_ur_l(ur_pub,temp_q,0.2,ace,urt)
+        #             time.sleep(1)
+        #             if place_count>=4:
+        #                 pose_place=p0.caculate_place_pose_from_ref(temp_q,0)
+        #             else:
+        #                 pose_place=p0.caculate_place_pose_from_ref(temp_q,1)
+        #             rospy.set_param("/open_go_to_object",0)
+        #             p0.move_ur_l(ur_pub,pose_place[0],0.2,ace,urt)
+        #             time.sleep(1)
+        #             p0.move_ur_l(ur_pub,pose_place[1],0.2,ace,urt)
+        #             time.sleep(1)
+        #             p0.move_ur_l(ur_pub,pose_place[place_count],0.2,ace,urt)
+        #             time.sleep(1)
 
-                    # p0.move_ur_l(ur_pub,cartisian_feedback,0.2,ace,urt)#for debug
-                    p0.move_ur_l(ur_pub,pose_place[place_count],0.1,ace,urt)
-                    time.sleep(2)
+        #             temp_q_place=p0.get_inverse_to_box(pose_place[place_count],0,0,-0.44)
+        #             p0.move_ur_l(ur_pub,temp_q_place,0.2,ace,urt)
+        #             time.sleep(1)   
+        #             os.system("rostopic pub /io_state std_msgs/String '55C8010055' -1")   
                     
-                    p0.uv_desire_list_buffer=[]
-                    rospy.set_param("open_go_desire_flag",0)
-                    p0.move_ur_l(ur_pub,start_angular_back,0.2,ace,urt)
-                    time.sleep(5)
-                    rospy.set_param("/open_go_to_desire",0)
+        #             # p0.move_ur_l(ur_pub,cartisian_feedback,0.2,ace,urt)#for debug
+        #             p0.move_ur_l(ur_pub,pose_place[place_count],0.2,ace,urt)
+        #             time.sleep(2)
+                    
+        #             p0.uv_desire_list_buffer=[]
+        #             rospy.set_param("open_go_desire_flag",0)
+        #             p0.move_ur_l(ur_pub,start_angular_back,0.2,ace,urt)
+        #             time.sleep(5)
+        #             rospy.set_param("/open_go_to_desire",0)
 
-                    rospy.set_param("/open_go_to_object",1)
-                    rospy.set_param("open_ibvs_flag",1)
-                    place_count+=1
+        #             rospy.set_param("/open_go_to_object",1)
+        #             rospy.set_param("open_ibvs_flag",1)
+        #             place_count+=1
 
 
         rate.sleep()

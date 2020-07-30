@@ -231,26 +231,26 @@ class IBVSControl():
         pos1=self.get_inverse_to_box(pos0,x_length,y_length,depth)
         final.update({1:pos1})
 
-        x_length=0.096
-        y_length=0.096
+        x_length=0.085
+        y_length=0.085
         depth=0
         pos2=self.get_inverse_to_box(pos1,x_length,y_length,depth)
         final.update({2:pos2})
 
-        x_length=0.081
-        y_length=0.081
+        x_length=0.092
+        y_length=0.092
         depth=0
         pos3=self.get_inverse_to_box(pos2,x_length,y_length,depth)
         final.update({3:pos3})
 
-        x_length=0.063
-        y_length=-0.063
+        x_length=0.066
+        y_length=-0.066
         depth=0
         pos4=self.get_inverse_to_box(pos1,x_length,y_length,depth)
         final.update({4:pos4}) 
 
-        x_length=0.053
-        y_length=-0.053
+        x_length=0.068
+        y_length=-0.068
         depth=0
         pos5=self.get_inverse_to_box(pos4,x_length,y_length,depth)
         final.update({5:pos5})   
@@ -282,7 +282,7 @@ def main():
     # urdfname="/data/ros/ur_ws/src/universal_robot/ur_description/urdf/ur5.urdf"
     desiruv=[]
 
-    lambda1=-0.796666
+    lambda1=-0.766666
 
     detat=0.05
     z=0.92
@@ -411,9 +411,8 @@ def main():
                     else:
                         pose_place=p0.caculate_place_pose_from_ref(temp_q,1)
                     rospy.set_param("/open_go_to_object",0)
-                    if place_count>=4:
-                        p0.move_ur_l(ur_pub,pose_place[0],0.05,ace,urt)
-                        time.sleep(2.5)
+                    # p0.move_ur_l(ur_pub,pose_place[0],0.05,ace,urt)
+                    # time.sleep(2.5)
                     # p0.move_ur_l(ur_pub,pose_place[1],0.05,ace,urt)
                     # time.sleep(2.5)
                     p0.move_ur_l(ur_pub,pose_place[place_count],0.05,ace,urt)
@@ -431,7 +430,7 @@ def main():
                     os.system("rostopic pub /io_state std_msgs/String '55C8010055' -1")   
 
                     # p0.move_ur_l(ur_pub,cartisian_feedback,0.2,ace,urt)#for debug
-                    p0.move_ur_l(ur_pub,pose_place[place_count],0.1,ace,urt)
+                    p0.move_ur(ur_pub,pose_place[place_count],0.1,ace,urt)
                     time.sleep(2)
                     
                     p0.uv_desire_list_buffer=[]
