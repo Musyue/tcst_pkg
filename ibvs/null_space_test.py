@@ -42,7 +42,7 @@ class null_space_control:
         self.t=0
 
         self.kpr=0.3
-        self.kq4=1000
+        self.kq4=0.1
         self.kq6=1000 
         self.bq4=pi/20
         self.bq6=pi/20
@@ -165,7 +165,7 @@ def getpi(listb):
         listcc.append(temp)
     return listcc
 def main():
-    step=0.01
+    step=0.001
     time1=10
     tnum=int(time1/step+1)
     omega=0.5
@@ -203,7 +203,7 @@ def main():
 
             rospy.logerr("arm_qdot---------"+str(arm_qdot))
 
-            # null_space_o.urscript_speedj_pub(arm_qdot,ace,urt)
+            null_space_o.urscript_speedj_pub(arm_qdot,ace,urt)
 
             rate.sleep()
             count+=1
